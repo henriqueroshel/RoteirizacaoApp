@@ -1,0 +1,168 @@
+#:kivy 1.0.9
+
+# COLORS DEFINITIONS
+#:set BLACK (0,0,0,1)
+#:set WHITE (1,1,1,1)
+#:set PRIMARY_COLOR_I   (3/255, 53/255, 77/255, 1)
+#:set PRIMARY_COLOR_II  (4/255, 86/255, 126/255, 1)
+#:set PRIMARY_COLOR_III (2/255, 35/255, 51/255, 1)
+#:set SECONDARY_COLOR_I   (170/255, 170/255, 115/255, 1)
+#:set SECONDARY_COLOR_II  (195/255, 195/255, 145/255, 1)
+#:set SECONDARY_COLOR_III (220/255, 220/255, 175/255, 1)
+
+<SectionTitle@Label>
+    color: PRIMARY_COLOR_I
+    bold: True
+    font_size: 16
+    size_hint: {1, None}
+    height: 30
+    pos_hint: {'top':1}
+    
+    canvas.before:
+        Color:
+            rgba: SECONDARY_COLOR_II
+        RoundedRectangle:
+            size: self.size
+            pos: self.pos
+            radius: [(8,8),(0,0),(8,8),(0,0)]
+
+
+<RoundedButton@Button>
+    background_normal: ''
+    background_color: (0,0,0,0)
+    halign: 'center'
+    font_size: 18
+    bold: True    
+    color: WHITE
+    outline_width: 1
+    outline_color: PRIMARY_COLOR_III
+    valign: 'center'
+    padding_x: 5
+
+    canvas.before:
+        Color:
+            rgba: SECONDARY_COLOR_III if self.state == 'normal' else SECONDARY_COLOR_I
+        RoundedRectangle:
+            size: self.size
+            pos: (self.x+3, self.y-3) if self.state == 'normal' else (self.x+5, self.y-5)
+            radius: [15]
+        Color:
+            rgba: SECONDARY_COLOR_I if self.state == 'normal' else SECONDARY_COLOR_III
+        RoundedRectangle:
+            size: self.size
+            pos: (self.x, self.y) if self.state == 'normal' else (self.x+2, self.y-2)
+            radius: [15]
+
+<Spinner>
+    text: ''
+    values: ['']
+    color: WHITE
+    size_hint:(1.25,None)
+    height: 35
+    pos_hint: {'right': 1, 'center_y':0.5}
+    sync_height: True
+
+<AppLayout>:
+    canvas.before:
+        Color:
+            rgba: PRIMARY_COLOR_I
+        Rectangle:
+            size: self.size
+            pos: self.pos
+
+    BoxLayout:
+        size: root.width, root.height
+        orientation: "vertical"
+        spacing: 20
+        padding: 20
+        pos_hint: {'top':1}
+
+        SectionTitle:
+            text: '1. Arquivo de entrada (tabela de pares origem destino)'
+    
+        BoxLayout:
+            id: inputfile_box
+            orientation: "horizontal"
+            spacing: 20
+
+            TextInput:
+                id: inputfile
+                multiline: True
+                font_size: 14
+                background_color: (.75,.75,.75)
+                color: (.25,.25,.25)
+                readonly: True
+            
+            
+            BoxLayout:
+                orientation: "vertical"
+                spacing: 10
+                size_hint: (None, 1)
+                width: 125
+                RoundedButton:
+                    text: 'Selecionar'
+                    on_release: root.getInputFileButton()
+                    pos_hint:  {'center_x':.5, 'center_y':.5}        
+                RoundedButton:
+                    text: 'Carregar'
+                    on_release: root.input_df = root.openInputFileButton()
+                    pos_hint:  {'center_x':.5, 'center_y':.5}    
+                        
+        SectionTitle:
+            text: '2. Selecione os nomes das colunas no arquivo de entrada'
+
+        BoxLayout:
+            orientation: "horizontal"
+            spacing: 20
+            pos_hint:  {'bottom': 1}
+
+            GridLayout:
+                cols: 4
+                spacing: 10
+                size_hint: 1,1                
+                
+                Label:
+                    text: 'Cidades origem'
+                    text_size: self.size
+                    valign: 'center'
+                    padding_x: 5
+                FloatLayout:
+                    Spinner:
+                        id: dropdown_orig
+                        on_text: root.colunas['origem'] = self.text
+
+                Label:
+                    text: 'UF origem'
+                    text_size: self.size
+                    valign: 'center'
+                    padding_x: 5
+                FloatLayout:
+                    Spinner:
+                        id: dropdown_origUF
+                        on_text: root.colunas['origemUF'] = self.text
+
+                Label:
+                    text: 'Cidades destino'
+                    text_size: self.size
+                    valign: 'center'
+                    padding_x: 5
+                FloatLayout:
+                    Spinner:
+                        id: dropdown_dest
+                        on_text: root.colunas['destino'] = self.text
+
+                Label:
+                    text: 'UF destino'
+                    text_size: self.size
+                    valign: 'center'
+                    padding_x: 5
+                FloatLayout:
+                    Spinner:
+                        id: dropdown_destUF
+                        on_text: root.colunas['destinoUF'] = self.text
+
+            RoundedButton:
+                text: 'ROTEIRIZAR'
+                on_release: root.ROTEIRIZACAO()
+                size_hint: (None, 1)
+                width: 125
