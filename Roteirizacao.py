@@ -4,14 +4,17 @@ Roteirizacao.py
 author: Henrique Roschel
 
 O presente arquivo apresenta funcoes para gerar 
-tabelas de roteirizaÃ§Ã£o rodoviaria entre cidades.
-Os dados sÃ£o acessados no website https://www.mapeia.com.br/
+tabelas de roteirização rodoviaria entre cidades.
+Os dados sao acessados no website https://www.mapeia.com.br/
 """
 
+#from logging import root
 import pandas as pd
 import numpy as np
+import tkinter as tk
+import time
 
-#from kivy.clock import Clock
+from tkinter import ttk
 from selenium import webdriver
 from selenium.common.exceptions import NoSuchElementException, ElementClickInterceptedException, TimeoutException
 from selenium.webdriver.common.by import By
@@ -23,49 +26,49 @@ from selenium.webdriver.support import expected_conditions as EC
 DB_filename = 'DB_ParesOD_roteirizados.csv'
 
 # Nomes das colunas no dataframe de entrada
-Orig_COL = 'cidade_orig'
-ufOrig_COL = 'uf_orig'
-Dest_COL = 'cidade_dest'
-ufDest_COL = 'uf_dest'
+ORIG_COL = 'cidade_orig'
+UFORIG_COL = 'uf_orig'
+DEST_COL = 'cidade_dest'
+UFDEST_COL = 'uf_dest'
 
 def DRIVER():
     # Definicao do selenium.webdriver utilizado nas queries
     options = webdriver.ChromeOptions()
-    #options.add_argument('--headless')
-    #options.add_argument('--no-sandbox')
-    #options.add_argument('--disable-dev-shm-usage')
-    #options.add_argument('--ignore-certificate-errors')
+    options.add_argument('--headless')
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-dev-shm-usage')
+    options.add_argument('--ignore-certificate-errors')
     d = webdriver.Chrome('chromedriver',options=options)
     return d
 
 def get_estado(uf):
     # Converte um determinado valor de UF para o nome do respectivo Estado
     uf_estados = {
-        "AC":"Acre", "AL":"Alagoas", "AP":"AmapÃ¡", "AM":"Amazonas", "BA":"Bahia", 
-        "CE":"CearÃ¡", "ES":"EspÃ­rito Santo", "GO":"GoiÃ¡s", "MA":"MaranhÃ£o", 
+        "AC":"Acre", "AL":"Alagoas", "AP":"Amapá", "AM":"Amazonas", "BA":"Bahia", 
+        "CE":"Ceará", "ES":"Espí­rito Santo", "GO":"Goiás", "MA":"Maranhão", 
         "MT":"Mato Grosso", "MS":"Mato Grosso do Sul", "MG":"Minas Gerais", 
-        "PA":"ParÃ¡", "PB":"ParaÃ­ba", "PR":"ParanÃ¡", "PE":"Pernambuco", 
-        "PI":"PiauÃ­", "RJ":"Rio de Janeiro", "RN":"Rio Grande do Norte", 
-        "RS":"Rio Grande do Sul", "RO":"RondÃ´nia", "RR":"Roraima", 
-        "SC":"Santa Catarina", "SP":"SÃ£o Paulo", "SE":"Sergipe", 
+        "PA":"Pará", "PB":"Paraí­ba", "PR":"Paraná", "PE":"Pernambuco", 
+        "PI":"Piauí­", "RJ":"Rio de Janeiro", "RN":"Rio Grande do Norte", 
+        "RS":"Rio Grande do Sul", "RO":"Rondônia", "RR":"Roraima", 
+        "SC":"Santa Catarina", "SP":"São Paulo", "SE":"Sergipe", 
         "TO":"Tocantins", "DF":"Distrito Federal" 
     }
     return uf_estados[uf]
 
 def join_parOD(origem, origemUF, destino, destinoUF):
     # Dado os nome dos municipios e suas UF, gera uma
-    # string Ãºnica para identificÃ¡-los, separada por espaÃ§os
+    # string única para identificá-los, separada por espaços
     return " ".join([origem, origemUF, destino, destinoUF])
 
 def save(dfs, filename = DB_filename):
     """
-    Concatena os dfs gerados em um sÃ³ e salva na base de dados utilizada
+    Concatena os dfs gerados em um so e salva na base de dados utilizada
 
     Parameters
     dfs : list of DataFrames
         dfs a serem reunidos e salvos em um arquivo
     filename : str
-        nome do arquivo a ser salvo com extensÃ£o .csv
+        nome do arquivo a ser salvo com extensão .csv
 
     Returns
     df : lista de um df apos salvar as queries
@@ -77,7 +80,39 @@ def save(dfs, filename = DB_filename):
 
     return [ df ]
 
-def roteirizacao(df_paresOD):
+class tk_window():
+    # Define a janela tkinter com a barra de progresso
+    def __init__(self, n_pbar):
+        PRIMARY_COLOR = '#dcdcaf'
+        SECONDARY_COLOR = '#022333'
+        
+        self.window = tk.Tk()
+        self.window.title = 'Roteirizacao'
+        self.window.eval('tk::PlaceWindow . center')
+        self.window['background']=PRIMARY_COLOR
+        self.window.geometry("300x150+400+200")
+
+        self.pbar = ttk.Progressbar(self.window, orient='horizontal',
+                                    length=200, maximum=n_pbar)
+        self.pbar.grid(row=0, column=0, padx=10, pady=10)
+        self.percent = tk.StringVar()
+        self.text = tk.StringVar()
+
+        self.percentLabel = tk.Label(self.window, textvariable=self.percent, 
+                            bg=PRIMARY_COLOR, fg=SECONDARY_COLOR, font=('Helvetica 14 bold'))
+        self.percentLabel.grid(row=0, column=1, padx=10, pady=10)
+        self.taskLabel = tk.Label(self.window, textvariable=self.text, 
+                            bg=PRIMARY_COLOR, fg=SECONDARY_COLOR, font=('Helvetica 14 bold'))
+        self.taskLabel.grid(row=1, column=0, columnspan=2, rowspan=1, padx=10, pady=10)
+
+    def update_idletasks(self):
+        self.window.update_idletasks()
+    def destroy(self):
+        self.window.destroy()
+
+
+
+def roteirizacao(df_paresOD, window=None):
     """
     Parameters
     ----------
@@ -88,15 +123,15 @@ def roteirizacao(df_paresOD):
 
     Returns
     -------
-        df com distÃ¢ncias e valores de pedagio entre cidades cruzando as
+        df com distâncias e valores de pedagio entre cidades cruzando as
         listas origem e destino
     """
 
-    origens = df_paresOD[[Orig_COL, ufOrig_COL]].drop_duplicates().to_numpy()
-    destinos = df_paresOD[[Dest_COL, ufDest_COL]].drop_duplicates().to_numpy()
+    origens = df_paresOD[[ORIG_COL, UFORIG_COL]].drop_duplicates().to_numpy()
+    destinos = df_paresOD[[DEST_COL, UFDEST_COL]].drop_duplicates().to_numpy()
 
-    df_paresOD['Par_OD'] =  df_paresOD[Orig_COL] +' '+ df_paresOD[ufOrig_COL] +' '
-    df_paresOD['Par_OD'] += df_paresOD[Dest_COL] +' '+ df_paresOD[ufDest_COL]
+    df_paresOD['Par_OD'] =  df_paresOD[ORIG_COL] +' '+ df_paresOD[UFORIG_COL] +' '
+    df_paresOD['Par_OD'] += df_paresOD[DEST_COL] +' '+ df_paresOD[UFDEST_COL]
     
     # carrega os trajetos ja buscados
     BASE_DADOS = pd.read_csv(DB_filename, encoding='latin-1', delimiter=';', decimal=',', index_col=None)  
@@ -105,6 +140,7 @@ def roteirizacao(df_paresOD):
 
     # Variaveis auxiliares para mapear a execucao
     cont=0                      # contador
+    n_pares = len(df_paresOD)   # numero de pares buscados
     tempo_qry=[]                # armazenamento dos tempos de cada iteracao
     qry_mean = "0.00sec/qry"    # string para o tempo medio de busca
 
@@ -128,8 +164,8 @@ def roteirizacao(df_paresOD):
         for origem in origens:
             orig_nome, orig_uf = origem
             # Filtra os pares desejados apenas para uma cidade origem 
-            aux = df_paresOD[ (df_paresOD[Orig_COL]==orig_nome) & (df_paresOD[ufOrig_COL]==orig_uf) ]
-            dict_paresOD[ tuple(origem) ] = aux[[ Dest_COL,ufDest_COL ]].to_numpy()
+            aux = df_paresOD[ (df_paresOD[ORIG_COL]==orig_nome) & (df_paresOD[UFORIG_COL]==orig_uf) ]
+            dict_paresOD[ tuple(origem) ] = aux[[ DEST_COL,UFDEST_COL ]].to_numpy()
 
         coluna_maior = 'Destino'
         coluna_menor = 'Origem'
@@ -138,15 +174,15 @@ def roteirizacao(df_paresOD):
         dropdown_maior_id = 'ui-id-2'
         dropdown_menor_id = 'ui-id-1'
 
-        # Adaptacao da funcao de geracao de uma identidade Ãºnica para o parOD
+        # Adaptacao da funcao de geracao de uma identidade única para o parOD
         parOD_id = lambda A_nome, A_uf, B_nome, B_uf : join_parOD(A_nome, A_uf, B_nome, B_uf)
 
     else: #len(origens) > len(destinos)
         for destino in destinos:
             dest_nome, dest_uf = destino
             # Filtra os pares desejados apenas para uma cidade destino
-            aux = df_paresOD[ (df_paresOD['cidade_destino']==dest_nome) & (df_paresOD['uf_destino']==dest_uf) ]
-            dict_paresOD[ tuple(destino) ] = aux[[ 'cidade_origem','uf_origem' ]].to_numpy()
+            aux = df_paresOD[ (df_paresOD[DEST_COL]==dest_nome) & (df_paresOD[UFDEST_COL]==dest_uf) ]
+            dict_paresOD[ tuple(destino) ] = aux[[ ORIG_COL,UFORIG_COL ]].to_numpy()
 
         coluna_maior = 'Origem'
         coluna_menor = 'Destino'
@@ -155,7 +191,7 @@ def roteirizacao(df_paresOD):
         dropdown_maior_id = 'ui-id-1'
         dropdown_menor_id = 'ui-id-2'
 
-        # Adaptacao da funcao de geracao de uma identidade Ãºnica para o parOD
+        # Adaptacao da funcao de geracao de uma identidade unica para o parOD
         parOD_id = lambda A_nome, A_uf, B_nome, B_uf : join_parOD(B_nome, B_uf, A_nome, A_uf)
 
     # Elemento botao para calculo da rota    
@@ -183,14 +219,12 @@ def roteirizacao(df_paresOD):
             parOD = parOD_id(cidadeA_nome, cidadeA_uf, cidadeB_nome, cidadeB_uf)
             paresOD_ids.append(parOD)
 
-            if parOD not in BASE_DADOS.Par_OD.to_list():
+            if parOD in BASE_DADOS.Par_OD.to_list():
                 # Apenas calcula a rota se o par OD nao estiver na base de dados
                 continue
 
             #inicio = time.time()
             try:
-                cont+=1
-    
                 # Preenche a query da cidade B no input da lista maior
                 cidadeB_qry = cidadeB_nome + ' ' + get_estado( cidadeB_uf )
                 input_maior_el.send_keys(Keys.CONTROL + "a" + Keys.DELETE)
@@ -250,6 +284,14 @@ def roteirizacao(df_paresOD):
                 )
                 dfs.append( qry_df )
             
+            if window:
+                time.sleep(0.01)
+                cont+=1
+                window.pbar['value'] = cont
+                window.percent.set(str(int((cont/n_pares)*100))+"%")
+                window.text.set(str(cont)+"/"+str(n_pares)+" pares OD\nroteirizados")
+                window.update_idletasks()
+
             if cont % 10 == 0:
                 # A cada 10 queries salva o progresso
                 dfs = save(dfs)
@@ -272,22 +314,24 @@ def roteirizacao(df_paresOD):
     
     df_paresOD.drop(columns=['Par_OD'], inplace=True)
     df.drop(columns=['Par_OD'], inplace=True)
-    
-    driver.quit()
 
+    driver.quit()
     return df
 
 if __name__ == '__main__':
     df = pd.read_excel('Pares Teste.xlsx', index_col=None)
     #df = pd.read_csv('Pares Teste.csv', encoding='latin-1', delimiter=';', decimal=',', index_col=None)
     df = df.rename(columns={
-        'Municipio Origem':Orig_COL, 'UF Origem':ufOrig_COL,
-        'Municipio Terminal':Dest_COL,'UF Terminal':ufDest_COL
+        'Municipio Origem':ORIG_COL, 'UF Origem':UFORIG_COL,
+        'Municipio Terminal':DEST_COL,'UF Terminal':UFDEST_COL
     })
     
     BASE_DADOS = pd.read_csv(DB_filename, encoding='latin-1', delimiter=';', decimal=',', index_col=None)
     #BASE_DADOS = pd.read_excel(DB_filename.replace('csv','xlsx'), index_col=None)
 
-
-    newdf = roteirizacao(df)
-    print(f'\n{df} \n\n{newdf}')
+    window = tk_window(len(df))
+    
+    newdf = roteirizacao(df, window=window)
+    
+    window.window.mainloop()
+    #print(f'\n{df} \n\n{newdf}')
